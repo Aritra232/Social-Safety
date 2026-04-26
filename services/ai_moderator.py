@@ -3,7 +3,7 @@ import os
 from dotenv import load_dotenv
 import json
 import time
-from .toxicity_backup import check_toxicity
+
 
 load_dotenv()
 
@@ -47,16 +47,18 @@ def check_text(text):
             prompt = f"""
 You are a strict child-safety AI moderator.
 
-Analyze this text for:
-- Language & tone
-- Content appropriateness
-- Kindness
+Analyze this text and evaluate each category independently:
+1. Language & Tone - Is the language appropriate and tone respectful? (no slurs, hate speech, aggressive language)
+2. Content Appropriateness - Is the content suitable for children? (no violence, drugs, sexual references)
+3. Kindness - Is the message kind and non-bullying? (no insults, threats, harassment)
 
 Text: {text}
 
-Return ONLY valid JSON:
+Return ONLY valid JSON with boolean values (true = safe, false = unsafe):
 {{
-  "safe": true/false
+  "language_and_tone": true/false,
+  "content_appropriateness": true/false,
+  "kindness": true/false
 }}
 """
 
@@ -68,6 +70,11 @@ Return ONLY valid JSON:
             output = output.replace("```json", "").replace("```", "").strip()
 
             result = json.loads(output)
+
+            # Ensure all expected keys exist
+            for key in ["language_and_tone", "content_appropriateness", "kindness"]:
+                if key not in result:
+                    result[key] = False
 
             return result
 
@@ -81,12 +88,17 @@ Return ONLY valid JSON:
                     continue
                 else:
                     print("AI quota exceeded, using toxicity backup...")
+                    from .toxicity_backup import check_toxicity
                     return check_toxicity(text)
             else:
                 return {
-                    "safe": False
+                    "language_and_tone": False,
+                    "content_appropriateness": False,
+                    "kindness": False
                 }
 
     return {
-        "safe": False
+        "language_and_tone": False,
+        "content_appropriateness": False,
+        "kindness": False
     }
