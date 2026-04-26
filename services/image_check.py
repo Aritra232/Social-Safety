@@ -9,41 +9,44 @@ genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
 # Try models in order of expected quota limits (lite/flash models have higher free tier limits)
 MODEL_OPTIONS = [
-    # "models/gemini-2.5-flash-lite",  # Highest free tier limits
-    # "models/gemini-2.0-flash-lite-001",
-    # "models/gemini-flash-lite-latest",
-    # "models/gemini-2.5-flash",  # Good balance
-    # "models/gemini-2.0-flash-001",
-    # "models/gemini-flash-latest",
-    # "models/gemini-2.5-pro",  # Lower limits but more capable
-    # "models/gemini-pro-latest"
+    "models/gemini-2.5-flash-lite",  # Fastest and cheapest path for moderation
+    "models/gemini-2.0-flash-lite-001",
+    "models/gemini-flash-lite-latest",
+    "models/gemini-2.5-flash",
+    "models/gemini-2.0-flash-001",
+    "models/gemini-flash-latest",
     "models/gemini-2.5-pro",
-    "models/gemini-2.5-flash"
-    
 ]
 
-model = None
-for model_name in MODEL_OPTIONS:
-    try:
-        model = genai.GenerativeModel(model_name)
-        # Test the model with a simple request
-        test_response = model.generate_content("test")
-        print(f"Using model: {model_name}")
-        break
-    except Exception as e:
-        print(f"Model {model_name} failed: {e}")
-        continue
+_model = None
 
-if model is None:
+
+def get_model():
+    global _model
+    if _model is not None:
+        return _model
+
+    for model_name in MODEL_OPTIONS:
+        try:
+            # Keep model initialization lazy and lightweight (no startup API call).
+            _model = genai.GenerativeModel(model_name)
+            print(f"Using model: {model_name}")
+            return _model
+        except Exception as e:
+            print(f"Model {model_name} failed: {e}")
+
     print("All Gemini models failed. Using fallback.")
-    model = genai.GenerativeModel("models/gemini-1.0-pro")  # Fallback
+    _model = genai.GenerativeModel("models/gemini-1.0-pro")
+    return _model
 
-def check_image(image_bytes):
-    max_retries = 3
+
+def check_image(image_bytes, fast_mode=False):
+    max_retries = 1 if fast_mode else 3
     base_delay = 1
 
     for attempt in range(max_retries):
         try:
+            model = get_model()
             response = model.generate_content([
                 {
                     "mime_type": "image/jpeg",
@@ -86,7 +89,8 @@ SAFE or UNSAFE.
                     }
             else:
                 return {
-                    "safe": False                }
+                    "safe": False
+                }
 
     return {
         "safe": False
