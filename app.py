@@ -1,3 +1,20 @@
+import os
+import sys
+
+# Fix for missing VC++ Redistributable DLLs on Windows
+if os.name == 'nt':
+    # Try to find the Scripts directory in the venv
+    possible_scripts = [
+        os.path.join(os.path.dirname(__file__), 'venv', 'Scripts'),
+        os.path.join(sys.prefix, 'Scripts'),
+    ]
+    for scripts_path in possible_scripts:
+        if os.path.exists(scripts_path):
+            try:
+                os.add_dll_directory(scripts_path)
+            except (AttributeError, OSError):
+                pass
+
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from services.ai_moderator import check_text
 from services.image_check import check_image

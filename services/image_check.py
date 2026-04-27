@@ -16,7 +16,7 @@ load_dotenv()
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
 # Models
-gemini_model = genai.GenerativeModel("models/gemini-2.5-flash-lite")
+gemini_model = genai.GenerativeModel("models/gemini-2.5-flash")
 nude_detector = NudeDetector()
 
 # Thresholds (strict for children)

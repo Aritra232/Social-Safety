@@ -11,14 +11,15 @@ genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
 # Try models in order of expected quota limits (lite/flash models have higher free tier limits)
 MODEL_OPTIONS = [
-    "models/gemini-2.5-flash-lite",  # Highest free tier limits
-    "models/gemini-2.0-flash-lite-001",
-    "models/gemini-flash-lite-latest",
-    "models/gemini-2.5-flash",  # Good balance
-    "models/gemini-2.0-flash-001",
-    "models/gemini-flash-latest",
-    "models/gemini-2.5-pro",  # Lower limits but more capable
-    "models/gemini-pro-latest"
+    # "models/gemini-2.5-flash-lite",  # Highest free tier limits
+    # "models/gemini-2.0-flash-lite-001",
+    # "models/gemini-flash-lite-latest",
+    # "models/gemini-2.5-flash",  # Good balance
+    # "models/gemini-2.0-flash-001",
+    # "models/gemini-flash-latest",
+    # "models/gemini-2.5-pro",  # Lower limits but more capable
+    # "models/gemini-pro-latest"
+    "models/gemini-2.5-flash"
 ]
 
 model = None
