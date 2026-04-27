@@ -11,4 +11,3 @@ tensorflow-cpu
 nudenet  
 pillow
 optree
-msvc-runtime
