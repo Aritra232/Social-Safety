@@ -1,88 +1,76 @@
 import tempfile
 import os
 import cv2
-from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from .image_check import check_image
 
-VIDEO_EXTENSIONS = {"mp4", "mov", "mkv", "webm", "avi", "flv", "mpeg", "mpg"}
 
-
-def extract_frames_from_video(video_bytes, max_frames=5):
+def extract_frames_from_video(video_bytes, max_frames=30):
+    """
+    Extract 1 frame per second, max 30 frames.
+    """
     with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp_file:
         tmp_file.write(video_bytes)
         tmp_path = tmp_file.name
 
-    cap = None
+    frames = []
+    cap = cv2.VideoCapture(tmp_path)
+
     try:
-        cap = cv2.VideoCapture(tmp_path)
         if not cap.isOpened():
             return []
 
-        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         fps = cap.get(cv2.CAP_PROP_FPS)
-        if fps is None or fps <= 0:
-            fps = 25.0
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
-        if total_frames <= 0:
-            total_frames = 1
+        if fps <= 0:
+            fps = 25
 
-        # Sample roughly one frame every 2 seconds (up to max_frames) for speed.
-        step = max(1, int(fps * 2))
-        sampled = list(range(0, total_frames, step))
-        if not sampled:
-            sampled = [0]
+        step = int(fps)
 
-        if len(sampled) > max_frames:
-            interval = len(sampled) / float(max_frames)
-            sampled = [sampled[int(i * interval)] for i in range(max_frames)]
+        positions = list(range(0, total_frames, step))[:max_frames]
 
-        positions = []
-        for p in sampled:
-            positions.append(min(total_frames - 1, p))
-
-        frames = []
         for pos in positions:
             cap.set(cv2.CAP_PROP_POS_FRAMES, pos)
             success, frame = cap.read()
-            if not success or frame is None:
-                continue
 
-            success, jpg = cv2.imencode(".jpg", frame)
             if not success:
                 continue
 
-            frames.append(jpg.tobytes())
+            success, jpg = cv2.imencode(".jpg", frame)
+
+            if success:
+                frames.append(jpg.tobytes())
 
         return frames
+
     finally:
-        if cap is not None:
-            cap.release()
-        try:
-            os.remove(tmp_path)
-        except OSError:
-            pass
+        cap.release()
+        os.remove(tmp_path)
 
 
-def check_video(video_bytes, max_frames=5, frame_timeout_sec=8):
-    if not video_bytes or len(video_bytes) < 1000:
-        return {"safe": False}
+def check_video(video_bytes):
+    """
+    Video moderation:
+    - unsafe if any frame unsafe
+    - review if uncertain
+    """
+    frames = extract_frames_from_video(video_bytes, max_frames=30)
 
-    frames = extract_frames_from_video(video_bytes, max_frames=max_frames)
     if not frames:
-        return {"safe": False}
+        return {"safe": False, "review": True}
 
-    # Process frame-by-frame and return immediately on first unsafe frame.
-    with ThreadPoolExecutor(max_workers=1) as executor:
-        for frame in frames:
-            future = executor.submit(check_image, frame, True)
-            try:
-                result = future.result(timeout=frame_timeout_sec)
-            except TimeoutError:
-                return {"safe": False}
-            except Exception:
-                return {"safe": False}
+    review_needed = False
 
-            if not result.get("safe", False):
-                return {"safe": False}
+    for frame in frames:
+        result = check_image(frame)
 
-    return {"safe": True}
+        if result["safe"] is False:
+            if result["review"]:
+                review_needed = True
+            else:
+                return {"safe": False, "review": False}
+
+    if review_needed:
+        return {"safe": False, "review": True}
+
+    return {"safe": True, "review": False}
