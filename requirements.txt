@@ -6,3 +6,6 @@ python-dotenv
 detoxify
 opencv-python-headless
 pillow-heif
+opennsfw2
+nudenet  
+pillow
