@@ -15,6 +15,7 @@ RUN pip install --user --no-cache-dir -r requirements.txt
 # Runtime stage
 FROM python:3.11-slim
 
+
 # Copy installed packages from builder stage
 COPY --from=builder /root/.local /root/.local
 

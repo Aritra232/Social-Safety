@@ -4,24 +4,17 @@ os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 import os
 import io
 import tempfile
-import google.generativeai as genai
-import opennsfw2 as n2
+from google import genai
 from dotenv import load_dotenv
-from nudenet import NudeDetector
 from PIL import Image
 import pillow_heif
 
 load_dotenv()
 
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
-# Models
-gemini_model = genai.GenerativeModel("models/gemini-2.5-flash")
-nude_detector = NudeDetector()
-
-# Thresholds (strict for children)
-NUDE_THRESHOLD = 0.25
-NSFW_THRESHOLD = 0.30
+# Model
+gemini_model_name = "gemini-2.5-pro"
 
 
 def detect_and_convert_image(image_bytes):
@@ -68,86 +61,32 @@ def detect_and_convert_image(image_bytes):
         return image_bytes, "image/jpeg"
 
 
-def nudity_check(image_bytes):
+def check_image(image_bytes):
     """
-    Detect explicit body parts using NudeNet.
-    Returns:
-        True  -> unsafe
-        False -> safe
-        None  -> uncertain
-    """
-    temp_path = None
-    try:
-        # Convert image to JPEG first
-        converted_bytes, _ = detect_and_convert_image(image_bytes)
-        image = Image.open(io.BytesIO(converted_bytes))
-
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
-            temp_path = tmp.name
-            image.save(temp_path)
-
-        detections = nude_detector.detect(temp_path)
-
-        for item in detections:
-            if item["score"] >= NUDE_THRESHOLD:
-                return True
-
-        return False
-
-    except Exception:
-        return None
-
-    finally:
-        if temp_path and os.path.exists(temp_path):
-            os.remove(temp_path)
-
-
-def opennsfw_check(image_bytes):
-    """
-    General NSFW probability using OpenNSFW2.
-    Returns:
-        score between 0 and 1
-        None on error
-    """
-    temp_path = None
-    try:
-        # Convert image to JPEG first
-        converted_bytes, _ = detect_and_convert_image(image_bytes)
-        image = Image.open(io.BytesIO(converted_bytes)).convert("RGB")
-
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
-            temp_path = tmp.name
-            image.save(temp_path)
-
-        score = n2.predict_image(temp_path)
-        return float(score)
-
-    except Exception:
-        return None
-
-    finally:
-        if temp_path and os.path.exists(temp_path):
-            os.remove(temp_path)
-
-
-def gemini_check(image_bytes):
-    """
-    Gemini contextual moderation.
-    Returns:
-        True  -> safe
-        False -> unsafe
-        None  -> uncertain
+    Main image check function using Gemini API.
+    Returns {"safe": bool, "review": bool}
     """
     try:
         # Convert image and get proper mime type
         converted_bytes, mime_type = detect_and_convert_image(image_bytes)
 
-        response = gemini_model.generate_content([
-            {
-                "mime_type": mime_type,
-                "data": converted_bytes
-            },
-            """
+        from google.genai import types
+        part = types.Part.from_bytes(data=converted_bytes, mime_type=mime_type)
+
+        config = types.GenerateContentConfig(
+            safety_settings=[
+                types.SafetySetting(category="HARM_CATEGORY_HATE_SPEECH", threshold="BLOCK_ONLY_HIGH"),
+                types.SafetySetting(category="HARM_CATEGORY_DANGEROUS_CONTENT", threshold="BLOCK_ONLY_HIGH"),
+                types.SafetySetting(category="HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold="BLOCK_ONLY_HIGH"),
+                types.SafetySetting(category="HARM_CATEGORY_HARASSMENT", threshold="BLOCK_ONLY_HIGH"),
+            ]
+        )
+
+        response = client.models.generate_content(
+            model=gemini_model_name,
+            contents=[
+                part,
+                """
 You are a strict child safety AI moderator.
 
 Check whether this image contains:
@@ -161,48 +100,20 @@ SAFE
 or
 UNSAFE
 """
-        ])
+            ],
+            config=config
+        )
 
         output = response.text.strip().lower()
 
         if "unsafe" in output:
-            return False
-        if "safe" in output:
-            return True
-
-        return None
-
-    except Exception:
-        return None
-
-
-def check_image(image_bytes):
-    """
-    Final image moderation logic.
-    Returns:
-        {"safe": bool, "review": bool}
-    """
-
-    # 1. Explicit nudity check
-    nude_result = nudity_check(image_bytes)
-
-    if nude_result is True:
-        return {"safe": False, "review": False}
-
-    # 2. General NSFW score
-    nsfw_score = opennsfw_check(image_bytes)
-
-    if nsfw_score is not None:
-        if nsfw_score >= NSFW_THRESHOLD:
             return {"safe": False, "review": False}
+        elif "safe" in output:
+            return {"safe": True, "review": False}
+        else:
+            # Uncertain, err on side of caution
+            return {"safe": False, "review": True}
 
-    # 3. Gemini context moderation
-    gemini_result = gemini_check(image_bytes)
-
-    if gemini_result is False:
-        return {"safe": False, "review": False}
-
-    if gemini_result is None:
+    except Exception as e:
+        print(f"Image check failed: {e}")
         return {"safe": False, "review": True}
-
-    return {"safe": True, "review": False}

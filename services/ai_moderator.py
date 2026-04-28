@@ -1,4 +1,4 @@
-import google.generativeai as genai
+from google import genai
 import os
 from dotenv import load_dotenv
 import json
@@ -7,36 +7,10 @@ import time
 
 load_dotenv()
 
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
-# Try models in order of expected quota limits (lite/flash models have higher free tier limits)
-MODEL_OPTIONS = [
-    # "models/gemini-2.5-flash-lite",  # Highest free tier limits
-    # "models/gemini-2.0-flash-lite-001",
-    # "models/gemini-flash-lite-latest",
-    # "models/gemini-2.5-flash",  # Good balance
-    # "models/gemini-2.0-flash-001",
-    # "models/gemini-flash-latest",
-    # "models/gemini-2.5-pro",  # Lower limits but more capable
-    # "models/gemini-pro-latest"
-    "models/gemini-2.5-flash"
-]
-
-model = None
-for model_name in MODEL_OPTIONS:
-    try:
-        model = genai.GenerativeModel(model_name)
-        # Test the model with a simple request
-        test_response = model.generate_content("test")
-        print(f"Using model: {model_name}")
-        break
-    except Exception as e:
-        print(f"Model {model_name} failed: {e}")
-        continue
-
-if model is None:
-    print("All Gemini models failed. Using fallback.")
-    model = genai.GenerativeModel("models/gemini-1.0-pro")  # Fallback
+# Use the best available model for paid API
+MODEL_NAME = "gemini-2.5-pro"
 
 
 def check_text(text):
@@ -46,28 +20,35 @@ def check_text(text):
     for attempt in range(max_retries):
         try:
             prompt = f"""
-You are a strict child-safety AI moderator.
+You are a strict child-safety AI moderator. Analyze the following text for appropriateness.
 
-Analyze this text and evaluate each category independently:
-1. Language & Tone - Is the language appropriate and tone respectful? (no slurs, hate speech, aggressive language)
-2. Content Appropriateness - Is the content suitable for children? (no violence, drugs, sexual references)
-3. Kindness - Is the message kind and non-bullying? (no insults, threats, harassment)
+Text: "{text}"
 
-Text: {text}
-
-Return ONLY valid JSON with boolean values (true = safe, false = unsafe):
+Evaluate each category and return ONLY a valid JSON object with these exact keys and boolean values:
 {{
   "language_and_tone": true/false,
   "content_appropriateness": true/false,
   "kindness": true/false
 }}
+
+Examples:
+- Safe text "Hello, how are you?": {{"language_and_tone": true, "content_appropriateness": true, "kindness": true}}
+- Unsafe text "You are stupid and ugly": {{"language_and_tone": false, "content_appropriateness": true, "kindness": false}}
+
+Do not include any other text, explanations, or formatting. Return only the JSON.
 """
 
-            response = model.generate_content(prompt)
+            response = client.models.generate_content(model=MODEL_NAME, contents=prompt)
 
             output = response.text.strip()
 
-            # clean possible markdown
+            # Try to extract JSON from response
+            import re
+            json_match = re.search(r'\{.*\}', output, re.DOTALL)
+            if json_match:
+                output = json_match.group(0)
+
+            # Clean markdown
             output = output.replace("```json", "").replace("```", "").strip()
 
             result = json.loads(output)
@@ -88,9 +69,12 @@ Return ONLY valid JSON with boolean values (true = safe, false = unsafe):
                     time.sleep(delay)
                     continue
                 else:
-                    print("AI quota exceeded, using toxicity backup...")
-                    from .toxicity_backup import check_toxicity
-                    return check_toxicity(text)
+                    print("AI quota exceeded, failing...")
+                    return {
+                        "language_and_tone": False,
+                        "content_appropriateness": False,
+                        "kindness": False
+                    }
             else:
                 return {
                     "language_and_tone": False,

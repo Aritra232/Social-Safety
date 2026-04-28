@@ -1,13 +1,8 @@
 fastapi
 uvicorn[standard]
 python-multipart
-google-generativeai
+google-genai
 python-dotenv
-detoxify
 opencv-python-headless
-pillow-heif
-opennsfw2
-tensorflow-cpu
-nudenet  
 pillow
-optree
+pillow-heif
