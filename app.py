@@ -20,6 +20,7 @@ from services.ai_moderator import check_text
 from services.image_check import check_image
 from services.video_check import check_video
 from services.pii_check import check_pii
+from services.emoji_check import check_emoji
 
 app = FastAPI()
 
@@ -40,6 +41,7 @@ async def check_content(
     content_appropriateness = True
     kindness = True
     personal_info_safe = True
+    emoji_safe = True
 
     if caption:
         text_result = check_text(caption)
@@ -50,6 +52,10 @@ async def check_content(
         # 🔹 PII CHECK (only if caption provided)
         pii_result = check_pii(caption)
         personal_info_safe = pii_result["safe"]
+
+        # 🔹 EMOJI CHECK (only if caption provided)
+        emoji_result = check_emoji(caption)
+        emoji_safe = emoji_result["safe"]
 
     # 🔹 IMAGE / VIDEO CHECK → "photos" field
     photos_safe = True
@@ -68,7 +74,8 @@ async def check_content(
         content_appropriateness,
         photos_safe,
         personal_info_safe,
-        kindness
+        kindness,
+        emoji_safe
     ])
 
     return {
@@ -77,5 +84,6 @@ async def check_content(
         "photos": photos_safe,
         "personal_information": personal_info_safe,
         "kindness": kindness,
+        "emoji": emoji_safe,
         "overall": overall
     }

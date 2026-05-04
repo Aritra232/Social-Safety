@@ -7,6 +7,7 @@ A FastAPI-based content moderation system that checks text, images, and videos f
 ## 📌 Features
 
 - **Text Moderation**: Analyzes captions for inappropriate language, tone, and content using Gemini AI
+- **Emoji Awareness**: Detects adult-meaning or suggestive emoji patterns that could imply mature content
 - **Image Analysis**: Scans images for nudity, sexual content, violence, and unsafe material
 - **Video Checking**: Extracts key frames from videos and performs safety analysis on each frame
 - **PII Detection**: Identifies and blocks personal information (phone numbers, emails) in captions
