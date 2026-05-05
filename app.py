@@ -84,6 +84,5 @@ async def check_content(
         "photos": photos_safe,
         "personal_information": personal_info_safe,
         "kindness": kindness,
-        "emoji": emoji_safe,
         "overall": overall
     }
