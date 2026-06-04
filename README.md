@@ -47,9 +47,11 @@ A FastAPI-based content moderation system that checks text, images, and videos f
    Create a `.env` file in the project root:
    ```
    GEMINI_API_KEY=your_google_gemini_api_key_here
+   YOUTUBE_API_KEY=your_youtube_data_api_key_here
    ```
 
-   Get your API key from: https://aistudio.google.com/
+   Get your Gemini API key from: https://aistudio.google.com/
+   Get your YouTube Data API key from: https://console.developers.google.com/
 
 5. **Run the Server**
    ```bash
@@ -60,7 +62,7 @@ A FastAPI-based content moderation system that checks text, images, and videos f
 
 ---
 
-## 📋 API Endpoint
+## 📋 API Endpoints
 
 ### POST `/check-content`
 
@@ -71,17 +73,15 @@ Submit content (image/video) with caption for moderation.
 - `image` (file, optional): Image file to check
 - `video` (file, optional): Video file to check
 
-
 **Response:**
 ```json
 {
-  "safe": true
-}
-```
-or
-```json
-{
-  "safe": false
+  "language_and_tone": true,
+  "content_appropriateness": true,
+  "photos": true,
+  "personal_information": true,
+  "kindness": true,
+  "overall": true
 }
 ```
 
@@ -90,6 +90,42 @@ or
 curl -X POST http://127.0.0.1:8000/check-content \
   -F "caption=This is my post" \
   -F "image=@path/to/image.jpg"
+```
+
+### GET `/video-suggestions`
+
+Request kid-safe English YouTube videos for a grade and topic. The response returns only video links plus a short topic summary and a 4-question quiz.
+
+**Query parameters:**
+- `grade` (integer, required): 3 through 8
+- `topic` (string, required): subject/topic name, e.g. `Mathematics`, `Science`, `History`
+- `limit` (integer, optional): number of videos to return, default 2, maximum 12
+
+**Response:**
+```json
+{
+  "grade": 3,
+  "topic": "Mathematics",
+  "count": 12,
+  "videos": [
+    {
+      "url": "https://www.youtube.com/watch?v=...",
+      "summary": "Topic: Mathematics. This video explains the main idea in three simple sentences, gives a real-life example, and shows the important parts of the topic.",
+      "quiz": [
+        {
+          "question": "...",
+          "options": ["...", "...", "...", "..."],
+          "answer": "..."
+        }
+      ]
+    }
+  ]
+}
+```
+
+**Example (using curl):**
+```bash
+curl "http://127.0.0.1:8000/video-suggestions?grade=3&topic=Mathematics"
 ```
 
 

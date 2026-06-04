@@ -15,12 +15,14 @@ if os.name == 'nt':
             except (AttributeError, OSError):
                 pass
 
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Query
+from fastapi.concurrency import run_in_threadpool
 from services.ai_moderator import check_text
 from services.image_check import check_image
 from services.video_check import check_video
 from services.pii_check import check_pii
 from services.emoji_check import check_emoji
+from services.video_suggestions import get_video_suggestions
 
 app = FastAPI()
 
@@ -86,3 +88,20 @@ async def check_content(
         "kindness": kindness,
         "overall": overall
     }
+
+
+@app.get("/video-suggestions")
+async def video_suggestions(
+    grade: int = Query(..., ge=3, le=8),
+    topic: str = Query(..., min_length=1),
+    limit: int = Query(2, ge=1, le=12)
+):
+    """Return kid-friendly English YouTube videos for a grade and topic."""
+    try:
+        result = await run_in_threadpool(get_video_suggestions, grade, topic, limit)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=500, detail="Video suggestion lookup failed")
+
+    return result
