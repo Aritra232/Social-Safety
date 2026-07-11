@@ -1,15 +1,26 @@
-from google import genai
 import os
 from dotenv import load_dotenv
 import json
 import time
+from openai import OpenAI
 
 load_dotenv()
 
-client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-# Use the best available model for paid API
-MODEL_NAME = "gemini-2.5-pro"
+MODEL_NAME = os.getenv("OPENAI_MODEL", "gpt-4.1-mini")
+
+
+def _extract_json(text):
+    text = text.strip()
+    import re
+
+    json_match = re.search(r'\{.*\}', text, re.DOTALL)
+    if json_match:
+        text = json_match.group(0)
+
+    text = text.replace("```json", "").replace("```", "").strip()
+    return json.loads(text)
 
 def check_emoji(text):
     """
@@ -50,20 +61,18 @@ Be extremely strict - when in doubt, mark as unsafe for child protection.
 Return only the JSON, no other text.
 """
 
-            response = client.models.generate_content(model=MODEL_NAME, contents=prompt)
+            response = client.chat.completions.create(
+                model=MODEL_NAME,
+                messages=[
+                    {"role": "system", "content": "You are a strict child-safety AI moderator specializing in emoji analysis."},
+                    {"role": "user", "content": prompt},
+                ],
+                temperature=0,
+                response_format={"type": "json_object"},
+            )
 
-            output = response.text.strip()
-
-            # Try to extract JSON from response
-            import re
-            json_match = re.search(r'\{.*\}', output, re.DOTALL)
-            if json_match:
-                output = json_match.group(0)
-
-            # Clean markdown
-            output = output.replace("```json", "").replace("```", "").strip()
-
-            result = json.loads(output)
+            output = response.choices[0].message.content or "{}"
+            result = _extract_json(output)
 
             # Ensure the expected key exists
             if "safe" not in result:

@@ -1,19 +1,18 @@
-from google import genai
 import os
 from dotenv import load_dotenv
+from openai import OpenAI
 
 load_dotenv()
 
-client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 try:
     models = client.models.list()
-    print("Available Gemini models for your API key:")
+    print("Available OpenAI models for your API key:")
     print("=" * 50)
 
     for model in models:
-        print(f"Model: {model.name}")
-        print(f"Description: {model.description}")
+        print(f"Model: {model.id}")
         print("-" * 30)
 
 except Exception as e:

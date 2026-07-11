@@ -1,19 +1,19 @@
 # Child Safety Content Moderator
 
-A FastAPI-based content moderation system that checks text, images, and videos for child safety compliance using Google's Gemini AI and backup toxicity detection.
+A FastAPI-based content moderation system that checks text, images, and videos for child safety compliance using Gemini for image moderation, OpenAI for text and video-summary generation, and backup toxicity detection.
 
 ---
 
 ## 📌 Features
 
-- **Text Moderation**: Analyzes captions for inappropriate language, tone, and content using Gemini AI
+- **Text Moderation**: Analyzes captions for inappropriate language, tone, and content using OpenAI
 - **Emoji Awareness**: Detects adult-meaning or suggestive emoji patterns that could imply mature content
 - **Image Analysis**: Scans images for nudity, sexual content, violence, and unsafe material
 - **Video Checking**: Extracts key frames from videos and performs safety analysis on each frame
 - **PII Detection**: Identifies and blocks personal information (phone numbers, emails) in captions
-- **Quota Management**: Automatically switches between Gemini models with higher free tier limits
+- **Quota Management**: Uses OpenAI for text and video-generation paths, while keeping Gemini for image moderation
 - **Retry Logic**: Implements exponential backoff for rate-limited requests
-- **Backup System**: Falls back to local toxicity detection when AI service is unavailable
+- **Backup System**: Falls back to conservative defaults when AI service is unavailable
 - **Simple Response Format**: Returns only boolean safety status
 
 ---
@@ -23,7 +23,8 @@ A FastAPI-based content moderation system that checks text, images, and videos f
 ### Prerequisites
 - Python
 - pip (Python package manager)
-- Google Gemini API key
+- Google Gemini API key for image moderation
+- OpenAI API key for text moderation and video summaries
 
 ### Installation
 
@@ -47,10 +48,13 @@ A FastAPI-based content moderation system that checks text, images, and videos f
    Create a `.env` file in the project root:
    ```
    GEMINI_API_KEY=your_google_gemini_api_key_here
+  OPENAI_API_KEY=your_openai_api_key_here
    YOUTUBE_API_KEY=your_youtube_data_api_key_here
+  OPENAI_MODEL=gpt-4.1-mini
    ```
 
    Get your Gemini API key from: https://aistudio.google.com/
+  Get your OpenAI API key from: https://platform.openai.com/
    Get your YouTube Data API key from: https://console.developers.google.com/
 
 5. **Run the Server**

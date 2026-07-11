@@ -5,16 +5,16 @@ from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
 
 from dotenv import load_dotenv
-from google import genai
+from openai import OpenAI
 
 load_dotenv()
 
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY") or os.getenv("Youtube_API_KEY")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 SEARCH_URL = "https://youtube.googleapis.com/youtube/v3/search"
-MODEL_NAME = "gemini-2.5-pro"
+MODEL_NAME = os.getenv("OPENAI_MODEL", "gpt-4.1-mini")
 
-client = genai.Client(api_key=GEMINI_API_KEY)
+client = OpenAI(api_key=OPENAI_API_KEY)
 
 
 def normalize_topic(topic: str) -> str:
@@ -36,7 +36,7 @@ def build_search_query(grade: int, topic: str) -> str:
 
 
 def generate_video_summary_and_quiz(grade: int, topic: str, title: str, url: str, max_questions: int = 4) -> dict:
-    if not GEMINI_API_KEY:
+    if not OPENAI_API_KEY:
         return {
             "summary": (
                 f"Topic: {topic}. This video teaches the main idea in three simple sentences, includes a real-life example, and explains the parts of {topic}."
@@ -78,15 +78,16 @@ Video link: {url}
 """
 
     try:
-        response = client.models.generate_content(model=MODEL_NAME, contents=prompt)
-        output = response.text.strip()
-
-        import re
-        json_match = re.search(r'\{.*\}', output, re.DOTALL)
-        if json_match:
-            output = json_match.group(0)
-
-        output = output.replace("```json", "").replace("```", "").strip()
+        response = client.chat.completions.create(
+            model=MODEL_NAME,
+            messages=[
+                {"role": "system", "content": "You are an expert elementary school teacher using CRAFT prompt engineering."},
+                {"role": "user", "content": prompt},
+            ],
+            temperature=0,
+            response_format={"type": "json_object"},
+        )
+        output = response.choices[0].message.content or "{}"
         result = json.loads(output)
 
         if "summary" not in result or "quiz" not in result:
